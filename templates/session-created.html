@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style type="text/css">
+        .virus-sucks-screenshot {
+            max-width: 670px;
+        }
+        </style>
+    </head>
+    <body>
+        <h1>Link created</h1>
+
+        <p>Copy this link: <a href="{{base_url}}/session/{{id}}/data">{{base_url}}/session/{{id}}/data</a></p>
+        <p>Open <a href="https://virus.sucks/pluslife_app/" target="_blank">the unofficial virus.sucks PlusLife app</a>.</p>
+        <p>In that page, click to open the Settings panel:<br /><img class="virus-sucks-screenshot" src="/images/virus-sucks-settings-panel.png"></p>
+        <p>Paste the copied link into the field marked "Webhook URL":<br /><img class="virus-sucks-screenshot" src="/images/virus-sucks-webhook-url-field.png" /></p>
+        <p>Then just run your test through virus.sucks like normal. When your test completes, we will email the result to {{email_to_notify}}.</p>
+
+        <h2>Live graph</h2>
+        <p>If you want to see a snapshot of the virus.sucks graph, you can follow <a href="{{base_url}}/session/{{id}}/graph">this link to view the graph.</a>.</p>
+        <p>Note that the link will stop working as soon as results are emailed. This is because we don't store your data longer than we need to.</p>
+        <p>The graph doesn't currently auto-update, you should refresh it yourself to get updates.</p>
+    </body>
+</html>
