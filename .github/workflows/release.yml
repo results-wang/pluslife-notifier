@@ -26,9 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
-        run: apk add docker fontconfig-dev gcc g++
+        run: apk add docker fontconfig-dev fontconfig-static freetype-static gcc g++
       - name: Build binaries
-        # Copy file to rename for the release action
         run: cargo build --release
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
