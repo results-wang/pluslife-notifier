@@ -99,7 +99,7 @@ impl GraphData {
             .y_label_area_size(40)
             .build_cartesian_2d(
                 (self.min_time)..(self.max_time),
-                (self.min_value)..(self.max_value * 2),
+                (self.min_value)..(i64::max(self.max_value * 2, 5000)),
             )?;
 
         chart
