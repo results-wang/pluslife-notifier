@@ -15,8 +15,8 @@ pub const HEIGHT: u32 = 600;
 pub struct GraphData {
     pub min_time: f32,
     pub max_time: f32,
-    pub min_value: i64,
-    pub max_value: i64,
+    pub min_value: u32,
+    pub max_value: u32,
     pub lines: Vec<Line>,
 }
 
@@ -100,7 +100,7 @@ impl GraphData {
             .y_label_area_size(40)
             .build_cartesian_2d(
                 (self.min_time)..(self.max_time),
-                (self.min_value)..(i64::max(self.max_value * 2, 5000)),
+                (self.min_value)..(u32::max(self.max_value * 2, 5000)),
             )?;
 
         chart
@@ -134,7 +134,7 @@ impl GraphData {
 
 pub struct Line {
     pub color: RGBColor,
-    pub points: Vec<(f32, i64)>,
+    pub points: Vec<(f32, u32)>,
 }
 
 impl Line {
@@ -150,8 +150,8 @@ impl TestData {
     pub fn to_graph(&self) -> Result<GraphData, Error> {
         let mut min_time = f32::MAX;
         let mut max_time = f32::MIN;
-        let mut min_value = i64::MAX;
-        let mut max_value = i64::MIN;
+        let mut min_value = u32::MAX;
+        let mut max_value = u32::MIN;
         let mut lines = vec![
             Line::new(RGBColor(166, 206, 227)),
             Line::new(RGBColor(32, 120, 180)),
@@ -166,8 +166,8 @@ impl TestData {
             let time_minutes = sample.sampling_time as f32 / 600f32;
             min_time = f32::min(min_time, time_minutes);
             max_time = f32::max(max_time, time_minutes);
-            min_value = i64::min(min_value, sample.first_channel_result);
-            max_value = i64::max(max_value, sample.first_channel_result);
+            min_value = u32::min(min_value, sample.first_channel_result);
+            max_value = u32::max(max_value, sample.first_channel_result);
             if sample.starting_channel >= lines.len() {
                 return Err(Error::TooManyChannels(sample.starting_channel));
             }

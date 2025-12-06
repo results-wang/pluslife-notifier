@@ -69,41 +69,40 @@ impl TestData {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TestSample {
-    // TODO: What is this relative to? What's its scope/range?
+    // current_data_index is the index of the sample within the test run.
     #[serde(rename = "currentDataIndex")]
-    pub current_data_index: usize,
+    pub current_data_index: u8,
 
-    // TODO: Why first?
     #[serde(rename = "firstChannelResult")]
-    pub first_channel_result: i64,
+    pub first_channel_result: u32,
 
-    // TODO: Is this ever not 1?
+    // So far this appears to always be exactly 1.
     #[serde(rename = "numberOfChannels")]
     pub number_of_channels: usize,
 
-    // TODO: What is this?
+    /// sample_stream_number is a test identifier, which virus.sucks currently always hard-codes to 166.
     #[serde(rename = "sampleStreamNumber")]
-    pub sample_stream_number: i64,
+    pub sample_stream_number: u8,
 
-    // TODO: What is this? It seems to always be 1?
+    /// sample_type appears to be a reserved field always set to 1.
     #[serde(rename = "sampleType")]
-    pub sample_type: i64,
+    pub sample_type: u8,
 
     #[serde(rename = "samplingTemperature")]
     pub sampling_temperature: DegreesC,
 
-    // TODO: Units? Relative to?
-    // Looks like it's hundred-milliseconds since start of test.
+    // This is hundred-milliseconds since start of test.
     #[serde(rename = "samplingTime")]
-    pub sampling_time: u64,
+    pub sampling_time: u16,
 
-    // TODO: Why starting?
+    // Each sample currently appears to contain exactly one channel's sample, so the meaning of starting is unclear.
+    // In the wire format, this is a u8.
     #[serde(rename = "startingChannel")]
     pub starting_channel: usize,
 
-    // TODO: Why?
+    // total_number_of_samples always appears to be current_data_index + 1.
     #[serde(rename = "totalNumberOfSamples")]
-    pub total_number_of_samples: usize,
+    pub total_number_of_samples: u8,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -136,9 +135,9 @@ pub struct TestResult {
     #[serde(rename = "detectionResult")]
     pub detection_result: DetectionResult,
 
-    // TODO: Is this ever not 7?
+    // This appears to always be 7 so far.
     #[serde(rename = "numberOfChannels")]
-    pub number_of_channels: usize,
+    pub number_of_channels: u8,
 
     // TODO: Is this ever not 0?
     #[serde(rename = "startingChannel")]
