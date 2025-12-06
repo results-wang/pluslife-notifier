@@ -280,17 +280,18 @@ async fn handle_websocket_request(
     Path(id): Path<Uuid>,
     axum::extract::State(server_state): axum::extract::State<ServerState>,
 ) -> impl IntoResponse {
-    let websockets = {
+    let (websockets, state) = {
         let sessions = server_state.sessions.lock().unwrap();
         if let Some(session) = sessions.get(&id) {
-            session.websockets.clone()
+            (session.websockets.clone(), session.state.clone())
         } else {
             return (StatusCode::NOT_FOUND, "Unknown ID").into_response();
         }
     };
     ws.on_upgrade(move |websocket| async move {
-        let websocket_count = websockets.push(websocket);
+        let (socket, websocket_count) = websockets.push(websocket);
         info!(%id, websocket_count, "New websocket connected");
+        socket.notify(&state);
     })
 }
 

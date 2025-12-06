@@ -17,7 +17,7 @@ use crate::{
 
 #[derive(Clone, Default)]
 pub struct SessionSockets {
-    websockets: Arc<Mutex<Vec<Arc<tokio::sync::Mutex<WebSocket>>>>>,
+    websockets: Arc<Mutex<Vec<SessionSocket>>>,
 }
 
 impl SessionSockets {
@@ -35,17 +35,7 @@ impl SessionSockets {
             match maybe_message_json {
                 Ok(message) => {
                     for websocket in websockets {
-                        let message = message.clone();
-                        tokio::spawn(async move {
-                            let result = websocket
-                                .lock()
-                                .await
-                                .send(Message::Text(Utf8Bytes::from(message)))
-                                .await;
-                            if let Err(err) = result {
-                                error!(?err, "Error writing to websocket");
-                            }
-                        });
+                        websocket.send(message.clone());
                     }
                 }
                 Err(err) => {
@@ -55,10 +45,51 @@ impl SessionSockets {
         }
     }
 
-    pub fn push(&self, websocket: WebSocket) -> usize {
+    pub fn push(&self, websocket: WebSocket) -> (SessionSocket, usize) {
         let mut websockets = self.websockets.lock().unwrap();
-        websockets.push(Arc::new(tokio::sync::Mutex::new(websocket)));
-        websockets.len()
+        let websocket = SessionSocket::new(websocket);
+        websockets.push(websocket.clone());
+        (websocket, websockets.len())
+    }
+}
+
+#[derive(Clone)]
+pub struct SessionSocket {
+    socket: Arc<tokio::sync::Mutex<WebSocket>>,
+}
+
+impl SessionSocket {
+    fn new(websocket: WebSocket) -> SessionSocket {
+        SessionSocket {
+            socket: Arc::new(tokio::sync::Mutex::new(websocket)),
+        }
+    }
+
+    pub fn notify(&self, state: &State) {
+        let maybe_message_json = WebsocketMessage::try_from(state)
+            .and_then(|message| serde_json::to_string(&message).map_err(Into::into));
+        match maybe_message_json {
+            Ok(message) => {
+                self.send(message);
+            }
+            Err(err) => {
+                error!(?err, "Failed to serialize websocket message");
+            }
+        }
+    }
+
+    fn send(&self, message: String) {
+        let socket = self.socket.clone();
+        tokio::spawn(async move {
+            let result = socket
+                .lock()
+                .await
+                .send(Message::Text(Utf8Bytes::from(message)))
+                .await;
+            if let Err(err) = result {
+                error!(?err, "Error writing to websocket");
+            }
+        });
     }
 }
 
