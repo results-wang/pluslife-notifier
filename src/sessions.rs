@@ -10,12 +10,13 @@ use jiff::Timestamp;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::{Error, state::State};
+use crate::{Error, state::State, websockets::SessionSockets};
 
 #[derive(Clone)]
 pub struct ServerState {
     pub sessions: Arc<Mutex<Sessions>>,
     pub base_url: String,
+    pub websocket_base_url: String,
     pub sender_email: EmailAddress,
     pub mailgun_domain: String,
     pub mailgun_api_key: String,
@@ -25,6 +26,18 @@ pub struct ServerState {
 impl ServerState {
     pub fn try_from_env() -> Result<ServerState, Error> {
         let base_url = Self::env_var("BASE_URL")?;
+        let websocket_base_url = if let Some(suffix) = base_url.strip_prefix("http") {
+            "ws".to_string() + suffix
+        } else {
+            return Err(Error::InvalidEnvVar {
+                name: "BASE_URL".to_owned(),
+                cause: format!(
+                    "Expected BASE_URL to start with http but was '{}'",
+                    base_url
+                )
+                .into(),
+            });
+        };
         let sender_email = Self::env_var("SENDER_EMAIL")?;
         let sender_email =
             EmailAddress::from_str(&sender_email).map_err(|err| Error::InvalidEnvVar {
@@ -42,6 +55,7 @@ impl ServerState {
         Ok(ServerState {
             sessions: Arc::new(Mutex::new(Sessions::default())),
             base_url,
+            websocket_base_url,
             sender_email,
             mailgun_domain,
             mailgun_api_key,
@@ -89,6 +103,7 @@ impl Sessions {
             created: timestamp,
             email_to_notify,
             id,
+            websockets: SessionSockets::new(),
         };
         self.insert(id, session);
         id
@@ -116,4 +131,5 @@ pub struct Session {
     pub created: Timestamp,
     pub email_to_notify: EmailAddress,
     pub id: Uuid,
+    pub websockets: SessionSockets,
 }

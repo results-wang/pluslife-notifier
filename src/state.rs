@@ -1,6 +1,7 @@
 use crate::{
     Error,
     messages::{DetectionResult, Event, Message, SubgroupResult, TestData, TestResult},
+    websockets::SessionSockets,
 };
 
 #[derive(Clone, Debug)]
@@ -14,21 +15,27 @@ impl State {
         State::IncompleteTest(IncompleteTest::new(TestData::empty()))
     }
 
-    pub fn update(self, message: Message) -> Result<State, Error> {
+    pub fn update(self, message: Message, websockets: &SessionSockets) -> Result<State, Error> {
         match self {
             State::IncompleteTest(incomplete_test) => match message.event {
                 Event::TestFinished => {
                     if let Some(result) = message.test.result {
                         let completed_test = incomplete_test.complete(result, message.test.data)?;
-                        Ok(State::CompletedTest(completed_test))
+                        let new_state = State::CompletedTest(completed_test);
+                        websockets.notify(&new_state);
+                        Ok(new_state)
                     } else {
                         Err(Error::TestFinishedMissingResult)
                     }
                 }
-                Event::NewData => Ok(State::incomplete(message.test.data)),
+                Event::NewData => {
+                    let new_state = State::incomplete(message.test.data);
+                    websockets.notify(&new_state);
+                    Ok(new_state)
+                }
                 Event::DeviceReady => Ok(State::incomplete(message.test.data)),
                 Event::TestStarted => Ok(State::incomplete(message.test.data)),
-                _ => Err(Error::UnexpectedMessage(
+                Event::AlreadyTesting | Event::ContinueTest => Err(Error::UnexpectedMessage(
                     State::IncompleteTest(incomplete_test),
                     Box::new(message),
                 )),

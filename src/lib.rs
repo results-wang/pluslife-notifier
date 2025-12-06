@@ -9,6 +9,7 @@ pub mod messages;
 pub mod notifier;
 pub mod sessions;
 pub mod state;
+pub mod websockets;
 
 #[derive(Debug)]
 pub enum Error {

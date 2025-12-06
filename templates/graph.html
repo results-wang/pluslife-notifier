@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+    <body>
+        <p id="error">There is currently no data. Once some is received, it will be displayed here.</p>
+        <canvas id="graph" width="{{graph_width}}" height="{{graph_height}}"></canvas>
+        <section id="results"></section>
+
+        <script type="text/javascript">
+        const graphWidth = {{graph_width}};
+        const graphHeight = {{graph_height}};
+
+        const websocket = new WebSocket("{{base_url}}/session/{{id}}/updates");
+        websocket.onmessage = (event) => {
+            console.log(event);
+            let data;
+            try {
+                data = JSON.parse(event.data);
+            } catch (e) {
+                console.error("Error parsing JSON", err);
+                document.getElementById("error").textContent = "An error occurred";
+            }
+            if ("graph_png_base64" in data && data.graph_png_base64) {
+                const canvas = document.getElementById("graph");
+                const ctx = canvas.getContext("2d");
+                const image = new Image(graphWidth, graphHeight);
+                image.src = "data:image/png;base64, " + data.graph_png_base64;
+                console.log("Setting src");
+                setTimeout(() => ctx.drawImage(image, 0, 0, graphWidth, graphHeight), 0);
+                document.getElementById("error").textContent = "";
+            } else {
+                console.error("No graph_png_base64 in data");
+            }
+            if ("results" in data && data.results) {
+                const h2 = document.createElement("h2");
+                h2.textContent = "Your PlusLife results are in"
+
+                const overall = document.createElement("p");
+                overall.textContent = `Your overall result is ${data.results.overall}`;
+
+                const subgroupIntro = document.createElement("p");
+                subgroupIntro.textContent = "Your subgroup results are:";
+
+                const subgroupList = document.createElement("ul");
+                for (const {name, result} of data.results.subgroup_results) {
+                    const li = document.createElement("li");
+                    const resultName = document.createElement("strong");
+                    resultName.textContent = normaliseResultName(name);
+                    const resultContainer = document.createElement("span");
+                    resultContainer.textContent = `: ${result}`;
+                    li.append(resultName, resultContainer);
+                    subgroupList.append(li);
+                }
+                document.body.append(h2, overall, subgroupIntro, subgroupList);
+            }
+        }
+
+        function normaliseResultName(name) {
+            if (name === "IC") {
+                return "Control";
+            } else {
+                return name;
+            }
+        }
+        </script>
+    </body>
+</html>

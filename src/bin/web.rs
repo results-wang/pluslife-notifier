@@ -3,16 +3,17 @@ use std::{collections::BTreeMap, net::Ipv4Addr};
 use askama::Template;
 use axum::{
     Form, Json, Router,
-    extract::Path,
+    extract::{Path, WebSocketUpgrade},
     http::StatusCode,
     response::{Html, IntoResponse},
-    routing::{get, post},
+    routing::{any, get, post},
 };
 use axum_embed::ServeEmbed;
 use dotenv::dotenv;
 use email_address::EmailAddress;
 use jiff::Timestamp;
 use pluslife_notifier::{
+    graph,
     messages::Message,
     notifier::{notify, notify_error},
     sessions::{ServerState, Session},
@@ -66,7 +67,9 @@ async fn main() {
         .route("/session/create", post(create_session))
         .route("/session/{id}/data", post(receive_data))
         .route("/session/{id}/data", get(get_data_dummy))
-        .route("/session/{id}/graph", get(graph_data))
+        .route("/session/{id}/graph.png", get(generate_graph_image))
+        .route("/session/{id}/graph", get(live_graph))
+        .route("/session/{id}/updates", any(handle_websocket_request))
         .route("/dump", post(print_json_data))
         .route("/sessions/count", get(count_sessions))
         .layer(cors)
@@ -121,9 +124,10 @@ async fn receive_data(
             created,
             email_to_notify,
             id,
+            websockets,
         } = session;
         let event = message.event;
-        let state = state.update(message);
+        let state = state.update(message, &websockets);
         match state {
             Ok(State::CompletedTest(completed_test)) => {
                 info!(%id, "Received results");
@@ -160,6 +164,7 @@ async fn receive_data(
                         created,
                         email_to_notify,
                         id,
+                        websockets,
                     },
                 );
                 (StatusCode::OK, "Received")
@@ -174,6 +179,7 @@ async fn receive_data(
                             created,
                             email_to_notify,
                             id,
+                            websockets,
                         },
                     );
                 } else {
@@ -211,7 +217,7 @@ async fn print_json_data(Json(payload): Json<serde_json::Value>) -> String {
     "Received".to_owned()
 }
 
-async fn graph_data(
+async fn generate_graph_image(
     Path(id): Path<Uuid>,
     axum::extract::State(server_state): axum::extract::State<ServerState>,
 ) -> impl IntoResponse + Send {
@@ -267,4 +273,57 @@ async fn count_sessions(
 ) -> impl IntoResponse + Send {
     let sessions = server_state.sessions.lock().unwrap();
     format!("{}", sessions.len())
+}
+
+async fn handle_websocket_request(
+    ws: WebSocketUpgrade,
+    Path(id): Path<Uuid>,
+    axum::extract::State(server_state): axum::extract::State<ServerState>,
+) -> impl IntoResponse {
+    let websockets = {
+        let sessions = server_state.sessions.lock().unwrap();
+        if let Some(session) = sessions.get(&id) {
+            session.websockets.clone()
+        } else {
+            return (StatusCode::NOT_FOUND, "Unknown ID").into_response();
+        }
+    };
+    ws.on_upgrade(move |websocket| async move {
+        let websocket_count = websockets.push(websocket);
+        info!(%id, websocket_count, "New websocket connected");
+    })
+}
+
+#[derive(Template)]
+#[template(path = "graph.html")]
+struct LiveGraphResponse {
+    pub base_url: String,
+    pub id: Uuid,
+    pub graph_width: u32,
+    pub graph_height: u32,
+}
+
+async fn live_graph(
+    axum::extract::State(server_state): axum::extract::State<ServerState>,
+    Path(id): Path<Uuid>,
+) -> impl IntoResponse {
+    if server_state.sessions.lock().unwrap().get(&id).is_some() {
+        Html(
+            LiveGraphResponse {
+                base_url: server_state.websocket_base_url.clone(),
+                id,
+                graph_width: graph::WIDTH,
+                graph_height: graph::HEIGHT,
+            }
+            .render()
+            .unwrap(),
+        )
+        .into_response()
+    } else {
+        (
+            StatusCode::NOT_FOUND,
+            [(axum::http::header::CONTENT_TYPE, "text/plain")],
+            "This test ID was not recognised. Either it has not been registered, or the test has already finished.".as_bytes().to_owned(),
+        ).into_response()
+    }
 }

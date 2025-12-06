@@ -9,6 +9,9 @@ use plotters::{
 
 use crate::{Error, messages::TestData};
 
+pub const WIDTH: u32 = 800;
+pub const HEIGHT: u32 = 600;
+
 pub struct GraphData {
     pub min_time: f32,
     pub max_time: f32,
@@ -65,14 +68,12 @@ impl GraphData {
     }
 
     pub fn plot_to_buffer(&self) -> Result<Vec<u8>, Error> {
-        let width = 800_u32;
-        let height = 600_u32;
-        let mut buf = vec![0; (width * height * 3) as usize];
-        let backend = BitMapBackend::with_buffer(&mut buf, (width, height));
+        let mut buf = vec![0; (WIDTH * HEIGHT * 3) as usize];
+        let backend = BitMapBackend::with_buffer(&mut buf, (WIDTH, HEIGHT));
         self.plot(backend)?;
 
         let mut out = Vec::new();
-        let mut encoder = png::Encoder::new(&mut out, width, height);
+        let mut encoder = png::Encoder::new(&mut out, WIDTH, HEIGHT);
         encoder.set_color(png::ColorType::Rgb);
         encoder.set_depth(png::BitDepth::Eight);
         encoder
