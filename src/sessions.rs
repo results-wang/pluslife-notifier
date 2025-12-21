@@ -7,6 +7,7 @@ use std::{
 
 use email_address::EmailAddress;
 use jiff::Timestamp;
+use prometheus::{Histogram, HistogramOpts, HistogramVec, Opts, Registry};
 use tracing::info;
 use uuid::Uuid;
 
@@ -85,6 +86,98 @@ impl ServerState {
             }
         });
         id
+    }
+
+    pub fn get_metrics(&self) -> Registry {
+        let registry = Registry::new();
+        let session_duration = HistogramVec::new(
+            HistogramOpts {
+                common_opts: Opts {
+                    namespace: "web".to_owned(),
+                    subsystem: "session".to_owned(),
+                    name: "duration".to_owned(),
+                    help: "Time since session was created".to_owned(),
+                    const_labels: HashMap::new(),
+                    variable_labels: vec!["has_data".to_owned()],
+                },
+                buckets: Self::time_buckets(),
+            },
+            &["has_data"],
+        )
+        .expect("Metric should never fail to be created");
+        registry
+            .register(Box::new(session_duration.clone()))
+            .expect("Fresh registry should never fail to register metric");
+
+        let time_to_first_result = Histogram::with_opts(HistogramOpts {
+            common_opts: Opts {
+                namespace: "web".to_owned(),
+                subsystem: "session".to_owned(),
+                name: "time_to_first_result".to_owned(),
+                help: "Time to first result in a session".to_owned(),
+                const_labels: HashMap::new(),
+                variable_labels: vec![],
+            },
+            buckets: Self::time_buckets(),
+        })
+        .expect("Metric should never fail to be created");
+        registry
+            .register(Box::new(time_to_first_result.clone()))
+            .expect("Fresh registry should never fail to register metric");
+
+        let now = Timestamp::now();
+        let sessions = self.sessions.lock().unwrap();
+        for session in sessions.states.values() {
+            let duration_to_first_result = session.state.duration_to_first_result();
+            session_duration
+                .with_label_values(&[&format!("{}", duration_to_first_result.is_some())])
+                .observe(now.duration_since(session.created).as_secs_f64());
+            if let Some(duration_to_first_result) = duration_to_first_result {
+                time_to_first_result.observe(duration_to_first_result.as_secs_f64());
+            }
+        }
+        registry
+    }
+
+    fn time_buckets() -> Vec<f64> {
+        vec![
+            10_f64,
+            30_f64,
+            60_f64,
+            90_f64,
+            120_f64,
+            150_f64,
+            180_f64,
+            210_f64,
+            240_f64,
+            270_f64,
+            300_f64,
+            330_f64,
+            360_f64,
+            390_f64,
+            420_f64,
+            450_f64,
+            480_f64,
+            510_f64,
+            540_f64,
+            570_f64,
+            600_f64,
+            900_f64,
+            1200_f64,
+            1800_f64,
+            40_f64 * 60_f64,
+            60_f64 * 60_f64,
+            2_f64 * 60_f64 * 60_f64,
+            3_f64 * 60_f64 * 60_f64,
+            6_f64 * 60_f64 * 60_f64,
+            12_f64 * 60_f64 * 60_f64,
+            24_f64 * 60_f64 * 60_f64,
+            2_f64 * 24_f64 * 60_f64 * 60_f64,
+            3_f64 * 24_f64 * 60_f64 * 60_f64,
+            4_f64 * 24_f64 * 60_f64 * 60_f64,
+            5_f64 * 24_f64 * 60_f64 * 60_f64,
+            6_f64 * 24_f64 * 60_f64 * 60_f64,
+        ]
     }
 }
 

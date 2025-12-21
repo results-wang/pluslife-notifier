@@ -1,3 +1,5 @@
+use jiff::{SignedDuration, Timestamp};
+
 use crate::{
     Error,
     messages::{DetectionResult, Event, Message, SubgroupResult, TestData, TestResult},
@@ -12,10 +14,17 @@ pub enum State {
 
 impl State {
     pub fn started() -> State {
-        State::IncompleteTest(IncompleteTest::new(TestData::empty()))
+        State::IncompleteTest(IncompleteTest::new(TestData::empty(), None))
     }
 
-    pub fn update(self, message: Message, websockets: &SessionSockets) -> Result<State, Error> {
+    pub fn update(
+        self,
+        message: Message,
+        session_creation_time: Timestamp,
+        websockets: &SessionSockets,
+    ) -> Result<State, Error> {
+        let duration_to_first_result =
+            self.duration_to_first_result_or_since(session_creation_time);
         match self {
             State::IncompleteTest(incomplete_test) => match message.event {
                 Event::TestFinished => {
@@ -29,12 +38,18 @@ impl State {
                     }
                 }
                 Event::NewData => {
-                    let new_state = State::incomplete(message.test.data);
+                    let new_state = State::incomplete(message.test.data, duration_to_first_result);
                     websockets.notify(&new_state);
                     Ok(new_state)
                 }
-                Event::DeviceReady => Ok(State::incomplete(message.test.data)),
-                Event::TestStarted => Ok(State::incomplete(message.test.data)),
+                Event::DeviceReady => Ok(State::incomplete(
+                    message.test.data,
+                    duration_to_first_result,
+                )),
+                Event::TestStarted => Ok(State::incomplete(
+                    message.test.data,
+                    duration_to_first_result,
+                )),
                 Event::AlreadyTesting | Event::ContinueTest => Err(Error::UnexpectedMessage(
                     State::IncompleteTest(incomplete_test),
                     Box::new(message),
@@ -47,8 +62,8 @@ impl State {
         }
     }
 
-    fn incomplete(data: TestData) -> State {
-        State::IncompleteTest(IncompleteTest::new(data))
+    fn incomplete(data: TestData, duration_to_first_result: SignedDuration) -> State {
+        State::IncompleteTest(IncompleteTest::new(data, Some(duration_to_first_result)))
     }
 
     pub fn current_graph_png(&self) -> Result<Option<Vec<u8>>, Error> {
@@ -68,16 +83,32 @@ impl State {
             State::CompletedTest(test) => Ok(Some(test.graph_png.clone())),
         }
     }
+
+    pub fn duration_to_first_result(&self) -> Option<SignedDuration> {
+        match self {
+            State::IncompleteTest(test) => test.duration_to_first_result,
+            Self::CompletedTest(_) => None,
+        }
+    }
+
+    pub fn duration_to_first_result_or_since(&self, timestamp: Timestamp) -> SignedDuration {
+        self.duration_to_first_result()
+            .unwrap_or_else(|| Timestamp::now().duration_since(timestamp))
+    }
 }
 
 #[derive(Clone, Debug)]
 pub struct IncompleteTest {
     pub data: TestData,
+    pub duration_to_first_result: Option<SignedDuration>,
 }
 
 impl IncompleteTest {
-    pub fn new(data: TestData) -> IncompleteTest {
-        IncompleteTest { data }
+    pub fn new(data: TestData, duration_to_first_result: Option<SignedDuration>) -> IncompleteTest {
+        IncompleteTest {
+            data,
+            duration_to_first_result,
+        }
     }
 
     pub fn complete(self, result: TestResult, data: TestData) -> Result<CompletedTest, Error> {

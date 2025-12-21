@@ -17,6 +17,7 @@ mime = "0.3.17"
 plotters = "0.3.7"
 plotters-bitmap = "0.3.7"
 png = "0.18.0"
+prometheus = "0.14.0"
 reqwest = { version = "0.12.24", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 rust-embed = "8.9.0"
 serde = { version = "1.0.228", features = ["derive"] }

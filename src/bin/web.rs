@@ -19,6 +19,7 @@ use pluslife_notifier::{
     sessions::{ServerState, Session},
     state::State,
 };
+use prometheus::TextEncoder;
 use rust_embed::RustEmbed;
 use serde::Deserialize;
 use tower_http::cors::{Any, CorsLayer};
@@ -71,7 +72,7 @@ async fn main() {
         .route("/session/{id}/graph", get(live_graph))
         .route("/session/{id}/updates", any(handle_websocket_request))
         .route("/dump", post(print_json_data))
-        .route("/sessions/count", get(count_sessions))
+        .route("/metrics", get(metrics))
         .layer(cors)
         .with_state(server_state)
         .fallback_service(static_assets);
@@ -127,7 +128,7 @@ async fn receive_data(
             websockets,
         } = session;
         let event = message.event;
-        let state = state.update(message, &websockets);
+        let state = state.update(message, created, &websockets);
         match state {
             Ok(State::CompletedTest(completed_test)) => {
                 info!(%id, "Received results");
@@ -268,13 +269,6 @@ async fn get_data_dummy(
     }
 }
 
-async fn count_sessions(
-    axum::extract::State(server_state): axum::extract::State<ServerState>,
-) -> impl IntoResponse + Send {
-    let sessions = server_state.sessions.lock().unwrap();
-    format!("{}", sessions.len())
-}
-
 async fn handle_websocket_request(
     ws: WebSocketUpgrade,
     Path(id): Path<Uuid>,
@@ -327,4 +321,13 @@ async fn live_graph(
             "This test ID was not recognised. Either it has not been registered, or the test has already finished.".as_bytes().to_owned(),
         ).into_response()
     }
+}
+
+async fn metrics(axum::extract::State(server_state): axum::extract::State<ServerState>) -> String {
+    let registry = server_state.get_metrics();
+    let encoder = TextEncoder::new();
+    let metric_families = registry.gather();
+    encoder
+        .encode_to_string(&metric_families)
+        .expect("Encoding metrics should never fail")
 }
