@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::{
     Error,
     mailgun::{Attachment, Region, send_mailgun},
-    messages::SubgroupResult,
+    messages::{DetectionResult, SubgroupResult},
     state::CompletedTest,
 };
 
@@ -91,6 +91,7 @@ fn to_html_list(results: &[SubgroupResult]) -> String {
         str.push_str(normalise_result_name(&result.name));
         str.push_str("</strong>: ");
         str.push_str(&result.result.to_string());
+        str.push_str(maybe_expected(result));
         str.push_str("</li>\n");
     }
     str.push_str("</ul>");
@@ -102,6 +103,8 @@ fn to_markdown_list(results: &[SubgroupResult]) -> String {
     for result in results {
         str.push_str(" * ");
         str.push_str(normalise_result_name(&result.name));
+        str.push_str(": ");
+        str.push_str(&result.result.to_string());
         str.push('\n');
     }
     str
@@ -109,4 +112,12 @@ fn to_markdown_list(results: &[SubgroupResult]) -> String {
 
 fn normalise_result_name(name: &str) -> &str {
     if name == "IC" { "Control" } else { name }
+}
+
+fn maybe_expected(result: &SubgroupResult) -> &'static str {
+    if result.name == "IC" && result.result == DetectionResult::Positive {
+        " (This is expected)"
+    } else {
+        ""
+    }
 }

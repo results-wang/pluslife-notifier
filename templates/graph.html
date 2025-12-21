@@ -46,7 +46,7 @@
                     const resultName = document.createElement("strong");
                     resultName.textContent = normaliseResultName(name);
                     const resultContainer = document.createElement("span");
-                    resultContainer.textContent = `: ${result}`;
+                    resultContainer.textContent = `: ${result}` + maybeExpected(name, result);
                     li.append(resultName, resultContainer);
                     subgroupList.append(li);
                 }
@@ -59,6 +59,14 @@
                 return "Control";
             } else {
                 return name;
+            }
+        }
+
+        function maybeExpected(name, result) {
+            if (name === "IC" && result === "POSITIVE") {
+                return " (This is expected)";
+            } else {
+                return "";
             }
         }
         </script>

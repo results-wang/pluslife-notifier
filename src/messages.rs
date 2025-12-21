@@ -160,7 +160,7 @@ pub struct SubgroupResult {
     pub result: DetectionResult,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, strum_macros::Display, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, strum_macros::Display, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[serde(deny_unknown_fields)]
 pub enum DetectionResult {
